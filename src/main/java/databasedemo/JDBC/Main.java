@@ -6,23 +6,20 @@
 package databasedemo.JDBC;
 
 import java.sql.*;
+import io.github.cdimascio.dotenv.Dotenv;
 
 /**
  *
  * @author rod
  */
 public class Main {
-    
-    // These two lines are all you should need to change if you wanted to
-    // use a different DB engine such as MySQL, MSSQL, PostgreSQL, Oracle, etc
-    private static final String JDBC_DRIVER = "org.sqlite.JDBC";
-    // Different databases have different syntaxes for their connection strings.
-    // SQLite is quite simple and only requires a path (in this case 'demo.db').  
-    // Most engines like MySQL and MSSQL require
-    // usernames, passwords, and even ports to be specified as well.
-    private static final String CONNECTION_STRING = "jdbc:sqlite:demo.db";
-     
+
+    public static final Dotenv ENV = Dotenv.load();
+    public static final String CONNECTION_STRING = ENV.get("DB_URL");
+
+
     public static void main(String[] args) {
+
         if ( args.length > 0 && args[0].equals("--regen") ) {
             regenDB();
         } else {
@@ -34,11 +31,9 @@ public class Main {
     public static void sandbox() {
         
         try {
-            Class.forName(JDBC_DRIVER);
-        
-            try (Connection db = DriverManager.getConnection(CONNECTION_STRING) ) {
-                regenDB();
-            }
+            Class.forName(ENV.get("JDBC_DRIVER"));
+
+            addAuthorBAD("Bad", "'); DROP TABLE Author; --");
             
         } catch ( Exception e ) {
             System.err.println(e);
@@ -46,8 +41,9 @@ public class Main {
         }
     }
     
-    public static void getAuthors(Connection db) throws SQLException {
-        try (Statement stmt = db.createStatement()) {
+    public static void getAllAuthors() throws SQLException {
+        try (Connection db = DriverManager.getConnection(CONNECTION_STRING) ) {
+            Statement stmt = db.createStatement();
             ResultSet results = stmt.executeQuery(
                     "SELECT * "
                     + "FROM Author "
@@ -69,7 +65,7 @@ public class Main {
         }
     }
     
-    public static void addAuthorBAD(Connection db, String firstName, String lastName) throws SQLException {
+    public static void addAuthorBAD(String firstName, String lastName) throws SQLException {
         
         // WARNING: This method is vulnerable to an SQL injection attack!
         // (Think about what could happen if someone entered on of the 
@@ -81,16 +77,19 @@ public class Main {
         // NEVER USE UNESCAPED VALUES THAT A USER SUPPLIES IN A QUERY
         //
         // You should probably use a prepared statement instead (see addAuthor)
-        try ( Statement stmt = db.createStatement() ) {
+        try (Connection db = DriverManager.getConnection(CONNECTION_STRING) ) {
+            Statement stmt = db.createStatement();
             stmt.execute("INSERT INTO Author (first_name, last_name) VALUES"
                     + "('" + firstName + "', '" + lastName + "')");
         }
     }
     
-    public static void addAuthor(Connection db, String firstName, String lastName) throws SQLException {
+    public static void addAuthor(String firstName, String lastName) throws SQLException {
+
         String sql = "INSERT INTO Author (first_name, last_name) VALUES (?, ?)";
-        
-        try ( PreparedStatement stmt = db.prepareStatement(sql) ) {
+
+        try (Connection db = DriverManager.getConnection(CONNECTION_STRING) ) {
+            PreparedStatement stmt = db.prepareStatement(sql);
             // Using the PreparedStatement interface to set parameters in the
             // query is a safe way to use user-supplied values in a query.
             // The values supplied to the set* methods are automatically escaped
@@ -112,7 +111,7 @@ public class Main {
             // Every JDBC Driver class has a special static initializer that 
             // registers itself with the JDBC DriverManager class.
             // This is how the specific db engine is tied into the JDBC API.
-            Class.forName(JDBC_DRIVER);
+            Class.forName(ENV.get("JDBC_DRIVER"));
             
             db = DriverManager.getConnection(CONNECTION_STRING);
             
